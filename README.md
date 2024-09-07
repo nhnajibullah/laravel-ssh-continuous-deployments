@@ -44,3 +44,7 @@ Open your github repository then open `Settings > Secrets and variables > Action
 | SSH_PROD_USER        | your production  ssh username                                                               |
 | SSH_PROD_PORT        | your production  ssh port                                                                   |
 | SSH_PROD_TARGET_DIR  | project directory on your production server (/var/html/www or /home/username/your-project)  |
+
+### Last Step
+
+Commit your changes and then github action will take the rest for you to building javascript and css assets then uploading to your server automatically.
