@@ -1,0 +1,68 @@
+name: Deploy on push production to Production Server
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Get latest code
+        uses: actions/checkout@v4
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: /tmp/composer-cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: NPM Build Caching
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+          # Generate a new cache whenever packages or source files change.
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx', '**.css') }}
+          # If source files changed but packages didn't, rebuild from a prior cache.
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+
+      - name: Install Composer dependencies
+        uses: php-actions/composer@v6
+        with:
+          php_version: "8.2"
+          # add your requirements extensions below. Separate with space, for example: zip mbstring xdebug
+          php_extensions: zip
+          dev: no
+          args: "--ignore-platform-reqs --optimize-autoloader"
+
+      - name: Install node dependencies
+        run: npm ci
+
+      - name: Build Project
+        run: npm run build
+
+      - name: Sync files
+        uses: easingthemes/ssh-deploy@v5.1.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PROD_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SSH_PROD_HOST }}
+          REMOTE_USER: ${{ secrets.SSH_PROD_USER }}
+          REMOTE_PORT: ${{ secrets.SSH_PROD_PORT }}
+          SOURCE: "."
+          TARGET: ${{ secrets.SSH_PROD_TARGET_DIR }}
+          EXCLUDE: "/.git/, /node_modules/, /tests/"
+          SCRIPT_AFTER: |
+            cd ${{ secrets.SSH_PROD_TARGET_DIR }}
+            php artisan migrate --force
+            php artisan optimize
